@@ -14,6 +14,14 @@ def site_config():
     return json.loads(m.group(1)) if m else {}
 
 
+def oembed_title(video_id):
+    try:
+        u = "https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=" + video_id
+        return json.loads(urllib.request.urlopen(u, timeout=15).read().decode()).get("title", "")
+    except Exception:
+        return ""
+
+
 def check(handle):
     handle = handle.strip()
     if not handle:
@@ -57,8 +65,8 @@ def check(handle):
             t = json.loads('"' + m.group(1) + '"') if m else ""
         except Exception:
             t = m.group(1) if m else ""
-    if t.lower() in ("youtube", ""):
-        t = ""
+    if t.lower() in ("youtube", "") or len(t) < 3:
+        t = oembed_title(vid.group(1))
     start = re.search(r'"startTimestamp":"([^"]+)"', page)
     return {"videoId": vid.group(1), "title": t,
             "started": start.group(1) if start else ""}
