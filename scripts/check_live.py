@@ -32,8 +32,10 @@ def check(handle):
     except Exception as e:  # network hiccup: treat as unknown, keep going
         print("error", handle, e)
         return "error"
-    print("debug", handle, len(page), "canon:", (re.search(r'<link rel="canonical" href="([^"]+)"', page) or [None,None])[1] if re.search(r'<link rel="canonical" href="([^"]+)"', page) else None,
-          "isLiveNow" in page, "not a bot" in page, "consent" in page[:5000].lower())
+    marks = {k: (k in page) for k in ['"isLiveNow":true', '"isLive":true', 'liveStreamability', 'BADGE_STYLE_TYPE_LIVE_NOW', '"isLiveContent":true', 'og:url', 'videoDetails', 'rel="canonical"']}
+    m1 = re.search(r'"videoDetails":\{"videoId":"([\w-]{11})"', page)
+    m2 = re.search(r'og:url" content="([^"]+)"', page)
+    print("debug", handle, len(page), marks, m1.group(1) if m1 else "-", m2.group(1) if m2 else "-", page[:300].replace("\n", " "))
     vid = re.search(r'<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([\w-]{11})"', page)
     if not vid or '"isLiveNow":true' not in page:
         return None
