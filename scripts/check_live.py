@@ -38,7 +38,10 @@ def check(handle):
         return None  # channel page, not a stream: nothing live
     det = page[at:at + 15000]
     vid = re.search(r'"videoId":"([\w-]{11})"', det)
-    live = '"isLive":true' in det and '"isUpcoming":true' not in det
+    # /live only opens a video page while the channel is live (or has a stream scheduled)
+    upcoming = '"isUpcoming":true' in det or '"isUpcoming":true' in page[:400000] and '"isLive":true' not in page
+    ended = '"endTimestamp"' in page
+    live = not upcoming and not ended and ('"isLive":true' in page or '"isLiveNow":true' in page or '"isLiveContent":true' in det)
     print(handle, "video:", vid.group(1) if vid else None, "live:", live)
     if not vid or not live:
         return None
