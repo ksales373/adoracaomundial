@@ -45,13 +45,22 @@ def check(handle):
     print(handle, "video:", vid.group(1) if vid else None, "live:", live)
     if not vid or not live:
         return None
-    title = re.search(r'"title":"((?:[^"\\]|\\.)*)"', det)
+    t = ""
+    for pat in (r'<meta name="title" content="([^"]*)"', r'<meta property="og:title" content="([^"]*)"', r'<title>([^<]*)</title>'):
+        m = re.search(pat, page)
+        if m and m.group(1).strip():
+            t = re.sub(r"\s*-\s*YouTube$", "", html.unescape(m.group(1).strip()))
+            break
+    if len(t) < 3:
+        m = re.search(r'"title":"((?:[^"\\]|\\.){3,})"', det)
+        try:
+            t = json.loads('"' + m.group(1) + '"') if m else ""
+        except Exception:
+            t = m.group(1) if m else ""
+    if t.lower() in ("youtube", ""):
+        t = ""
     start = re.search(r'"startTimestamp":"([^"]+)"', page)
-    try:
-        t = json.loads('"' + title.group(1) + '"') if title else ""
-    except Exception:
-        t = title.group(1) if title else ""
-    return {"videoId": vid.group(1), "title": html.unescape(t),
+    return {"videoId": vid.group(1), "title": t,
             "started": start.group(1) if start else ""}
 
 
