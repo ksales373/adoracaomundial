@@ -32,6 +32,8 @@ def check(handle):
     except Exception as e:  # network hiccup: treat as unknown, keep going
         print("error", handle, e)
         return "error"
+    print("debug", handle, len(page), "canon:", (re.search(r'<link rel="canonical" href="([^"]+)"', page) or [None,None])[1] if re.search(r'<link rel="canonical" href="([^"]+)"', page) else None,
+          "isLiveNow" in page, "not a bot" in page, "consent" in page[:5000].lower())
     vid = re.search(r'<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([\w-]{11})"', page)
     if not vid or '"isLiveNow":true' not in page:
         return None
