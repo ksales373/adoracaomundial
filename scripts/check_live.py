@@ -32,17 +32,23 @@ def check(handle):
     except Exception as e:  # network hiccup: treat as unknown, keep going
         print("error", handle, e)
         return "error"
-    marks = {k: (k in page) for k in ['"isLiveNow":true', '"isLive":true', 'liveStreamability', 'BADGE_STYLE_TYPE_LIVE_NOW', '"isLiveContent":true', 'og:url', 'videoDetails', 'rel="canonical"']}
-    m1 = re.search(r'"videoDetails":\{"videoId":"([\w-]{11})"', page)
-    m2 = re.search(r'og:url" content="([^"]+)"', page)
-    print("debug", handle, len(page), marks, m1.group(1) if m1 else "-", m2.group(1) if m2 else "-", page[:300].replace("\n", " "))
-    vid = re.search(r'<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([\w-]{11})"', page)
-    if not vid or '"isLiveNow":true' not in page:
+    page = page.replace('\\"', '"')  # some responses escape the embedded JSON
+    at = page.find('"videoDetails":{')
+    if at < 0:
+        return None  # channel page, not a stream: nothing live
+    det = page[at:at + 15000]
+    vid = re.search(r'"videoId":"([\w-]{11})"', det)
+    live = '"isLive":true' in det and '"isUpcoming":true' not in det
+    print(handle, "video:", vid.group(1) if vid else None, "live:", live)
+    if not vid or not live:
         return None
-    title = re.search(r'<meta name="title" content="([^"]*)"', page)
+    title = re.search(r'"title":"((?:[^"\\]|\\.)*)"', det)
     start = re.search(r'"startTimestamp":"([^"]+)"', page)
-    return {"videoId": vid.group(1),
-            "title": html.unescape(title.group(1)) if title else "",
+    try:
+        t = json.loads('"' + title.group(1) + '"') if title else ""
+    except Exception:
+        t = title.group(1) if title else ""
+    return {"videoId": vid.group(1), "title": html.unescape(t),
             "started": start.group(1) if start else ""}
 
 
