@@ -1,6 +1,7 @@
 // Adoração Mundial: which church is live on YouTube right now.
 // Cloudflare Worker "am-live" at https://live.wwchurches.com/live.json
 // Runs every minute (cron). Checks one church per run, round-robin, and keeps the result in KV (binding LIVE).
+// Free-plan friendly: about 150 KV writes a day (on change, plus a heartbeat every 10 minutes).
 // The website reads /live.json (CORS open) and shows the live service at the top of every page.
 // Channel list comes from the site's own settings (locations[].youtube in index.html).
 const SITE = "https://ksales373.github.io/adoracaomundial/";
@@ -30,24 +31,27 @@ async function check(handle) {
   const res = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8", "Cookie": "CONSENT=YES+cb; SOCS=CAI" } });
   if (!res.ok) return { error: res.status };
   const p = await res.text();
-  let at = p.indexOf('"videoDetails":{'), esc = false;
-  if (at < 0) { at = p.indexOf('\\"videoDetails\\":{'); esc = at >= 0; }
+  // Look only inside the player data (ytInitialPlayerResponse), not the whole 1+ MB page.
+  let base = p.indexOf("ytInitialPlayerResponse");
+  if (base < 0) base = 0;
+  let at = p.indexOf('"videoDetails":{', base), esc = false;
+  if (at < 0) { at = p.indexOf('\\"videoDetails\\":{', base); esc = at >= 0; }
   if (at < 0) return null; // channel page: not live
-  let det = p.slice(at, at + 15000);
-  if (esc) det = det.split('\\"').join('"');
+  const norm = t => (esc ? t.split('\\"').join('"') : t);
+  const det = norm(p.slice(at, at + 15000));
+  const ps = p.indexOf("playabilityStatus", base);
+  const head = ps >= 0 ? norm(p.slice(ps, ps + 6000)) : "";  // playabilityStatus
+  const micro = norm(p.slice(at, at + 80000));        // microformat.liveBroadcastDetails
   const vid = (det.match(/"videoId":"([\w-]{11})"/) || [])[1];
   if (!vid) return null;
   const upcoming = det.includes('"isUpcoming":true');
-  const ended = p.includes('"endTimestamp"') || p.includes('\\"endTimestamp\\"');
-  const offline = p.includes("LIVE_STREAM_OFFLINE");
-  const liveFlag = p.includes('"isLiveNow":true') || det.includes('"isLive":true') || p.includes('\\"isLiveNow\\":true');
+  const ended = micro.includes('"endTimestamp"');
+  const offline = head.includes("LIVE_STREAM_OFFLINE");
+  const liveFlag = micro.includes('"isLiveNow":true') || det.includes('"isLive":true');
   if (upcoming || ended || offline || !liveFlag) return null;
-  let title = (p.match(/<meta name="title" content="([^"]*)"/) || [])[1] || "";
-  title = title.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-  if (!title || / is live!$/.test(title)) {
-    try { const o = await (await fetch("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=" + vid)).json(); if (o.title) title = o.title; } catch (e) {}
-  }
-  const started = (p.match(/"startTimestamp":"([^"]+)"/) || [])[1] || "";
+  let title = "";
+  try { const o = await (await fetch("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=" + vid)).json(); if (o.title) title = o.title; } catch (e) {}
+  const started = (micro.match(/"startTimestamp":"([^"]+)"/) || [])[1] || "";
   return { videoId: vid, title, started };
 }
 
@@ -55,10 +59,10 @@ async function runOne(env, which) {
   const list = await channels(env);
   const ids = Object.keys(list);
   if (!ids.length) return;
-  let i = which != null ? ids.indexOf(which) : (parseInt(await env.LIVE.get("next") || "0") % ids.length);
+  // round-robin by the clock (no KV write): each church is checked every ids.length minutes
+  let i = which != null ? ids.indexOf(which) : Math.floor(Date.now() / 60000) % ids.length;
   if (i < 0) i = 0;
   const id = ids[i];
-  await env.LIVE.put("next", String((i + 1) % ids.length));
   const state = (await env.LIVE.get("state", "json")) || { live: {}, checked: {} };
   let r;
   try { r = await check(list[id]); } catch (e) { r = { error: String(e) }; }
