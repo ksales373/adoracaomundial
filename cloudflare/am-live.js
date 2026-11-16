@@ -36,6 +36,10 @@ async function check(handle) {
   if (base < 0) base = 0;
   let at = p.indexOf('"videoDetails":{', base), esc = false;
   if (at < 0) { at = p.indexOf('\\"videoDetails\\":{', base); esc = at >= 0; }
+  if (at < 0 && base > 0) { // layout variant: look through the whole page
+    base = 0; at = p.indexOf('"videoDetails":{');
+    if (at < 0) { at = p.indexOf('\\"videoDetails\\":{'); esc = at >= 0; }
+  }
   if (at < 0) return null; // channel page: not live
   const norm = t => (esc ? t.split('\\"').join('"') : t);
   const det = norm(p.slice(at, at + 15000));
@@ -66,12 +70,21 @@ async function runOne(env, which) {
   const state = (await env.LIVE.get("state", "json")) || { live: {}, checked: {} };
   let r;
   try { r = await check(list[id]); } catch (e) { r = { error: String(e) }; }
-  const before = JSON.stringify(state.live[id] || null);
+  const before = JSON.stringify([state.live[id] || null, (state.miss || {})[id] || 0]);
   if (r && r.error) { state.checked[id] = { at: new Date().toISOString(), error: r.error }; }
-  else { if (r) state.live[id] = r; else delete state.live[id]; state.checked[id] = { at: new Date().toISOString() }; }
+  else {
+    state.miss = state.miss || {};
+    if (r) { state.live[id] = r; delete state.miss[id]; }
+    else if (state.live[id]) {
+      // YouTube sometimes serves a page we can't read: only drop a live after 3 misses in a row (~9 min)
+      state.miss[id] = (state.miss[id] || 0) + 1;
+      if (state.miss[id] >= 3) { delete state.live[id]; delete state.miss[id]; }
+    }
+    state.checked[id] = { at: new Date().toISOString() };
+  }
   for (const k of Object.keys(state.live)) if (!ids.includes(k)) delete state.live[k];
   state.updated = new Date().toISOString();
-  const changed = before !== JSON.stringify(state.live[id] || null);
+  const changed = before !== JSON.stringify([state.live[id] || null, (state.miss || {})[id] || 0]);
   // keep KV writes low: write on change, otherwise at most every 10 minutes
   const last = Date.parse(state.saved || 0);
   if (changed || Date.now() - last > 10 * 60e3) { state.saved = state.updated; await env.LIVE.put("state", JSON.stringify(state)); }
