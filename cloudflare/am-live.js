@@ -94,7 +94,7 @@ async function runOne(env, which) {
   const state = (await env.LIVE.get("state", "json")) || { live: {}, checked: {} };
   let r;
   try { r = await check(list[id], state.live[id]); } catch (e) { r = { error: String(e) }; }
-  const before = JSON.stringify([state.live[id] || null, (state.miss || {})[id] || 0]);
+  const before = JSON.stringify([state.live[id] || null, (state.miss || {})[id] || 0, (state.checked[id] || {}).tries || null]);
   if (r && r.error) { state.checked[id] = { at: new Date().toISOString(), error: r.error }; }
   else {
     state.miss = state.miss || {};
@@ -105,11 +105,11 @@ async function runOne(env, which) {
       state.lastMiss = { id, at: new Date().toISOString(), tries: r && r.tries };
       if (state.miss[id] >= 3) { delete state.live[id]; delete state.miss[id]; }
     }
-    state.checked[id] = { at: new Date().toISOString() };
+    state.checked[id] = { at: new Date().toISOString(), tries: r && r.tries };
   }
   for (const k of Object.keys(state.live)) if (!ids.includes(k)) delete state.live[k];
   state.updated = new Date().toISOString();
-  const changed = before !== JSON.stringify([state.live[id] || null, (state.miss || {})[id] || 0]);
+  const changed = before !== JSON.stringify([state.live[id] || null, (state.miss || {})[id] || 0, (state.checked[id] || {}).tries || null]);
   // keep KV writes low: write on change, otherwise at most every 10 minutes
   const last = Date.parse(state.saved || 0);
   if (changed || Date.now() - last > 10 * 60e3) { state.saved = state.updated; await env.LIVE.put("state", JSON.stringify(state)); }
