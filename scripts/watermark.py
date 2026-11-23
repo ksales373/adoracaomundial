@@ -1,6 +1,7 @@
 import sys
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-LOGO=Image.open('__import__('os').path.join(__import__('os').path.dirname(__file__),'..','img','569f690325138fc4db2591a39b664b30.png')').convert('RGBA')
+import os
+LOGO=Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','img','569f690325138fc4db2591a39b664b30.png')).convert('RGBA')
 FONT='/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf'
 def mark(src, dst):
     im=Image.open(src).convert('RGB'); W,H=im.size
