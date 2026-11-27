@@ -388,8 +388,12 @@ body:has(.wrap.visitor){padding:0}
 .lb .bar span{opacity:.8}
 .lb button{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:99px;padding:9px 15px;font-weight:700;cursor:pointer}
 .lb button:hover{background:rgba(255,255,255,.24)}
-.lb .stage{display:grid;place-items:center;min-height:0;padding-block:10px}
-.lb .stage img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.lb .stage{position:relative;min-height:0;cursor:zoom-out}
+.lb .stage img{position:absolute;inset:8px 0;margin:auto;max-width:100%;max-height:calc(100% - 16px);width:auto;height:auto;object-fit:contain;border-radius:8px;box-shadow:0 24px 70px rgba(0,0,0,.55);cursor:default;image-rendering:auto}
+html.lb-open,html.lb-open body{overflow:hidden}
+#lbhost .lb{height:100vh;height:100dvh;overscroll-behavior:contain;touch-action:pan-x pinch-zoom;font-family:var(--ui)}
+#lbhost .lb button{white-space:nowrap}
+@media (max-width:480px){#lbhost .lb .nav{gap:6px}#lbhost .lb .nav button{padding:9px 12px;font-size:14px}#lbhost .lb .bar{font-size:13px}}
 .lb .nav{display:flex;justify-content:center;gap:10px}
 
 .page-enter{animation:pageIn .35s ease both}
@@ -1901,6 +1905,9 @@ function pageContato(c){
   </div></section>`:""}`;
 }
 
+// Photo viewer lives outside the site container so it always fits the screen (the site box would otherwise contain it).
+function lbHost(){let h=document.getElementById("lbhost");if(!h){h=document.createElement("div");h.id="lbhost";document.body.appendChild(h);h.addEventListener("click",e=>{const lb=e.target.closest("[data-lb]");if(lb){const k=lb.dataset.lb;if(k==="close"){slideshow=false;closeLightbox()}else if(k==="play"){slideshow=!slideshow;renderSite(current())}else stepLightbox(k==="next"?1:-1);return}if(e.target.classList.contains("stage")){slideshow=false;closeLightbox()}})}return h}
+function lbRender(c){const h=lbHost();h.innerHTML=lightbox?lightboxHtml(c):"";document.documentElement.classList.toggle("lb-open",!!lightbox);if(lightbox){const a=(c.albums||[]).find(x=>x.id===lightbox.album);if(a&&a.photos.length>1)[1,-1].forEach(d=>{const p=a.photos[(lightbox.i+d+a.photos.length)%a.photos.length];if(p){const im=new Image();im.src=img(p.id)}})}}
 let lastFocus=null;
 function renderSite(c){
   const s=$("site");const L=applyTheme(s,c);applyTheme($("chat"),c);
@@ -1908,7 +1915,8 @@ function renderSite(c){
   s.dataset.vibe=c.loc.vibe||"";
   const map={historia:pageHistoria,loja:pageLoja,inicio:pageInicio,equipe:pageEquipe,cultos:pageCultos,sobre:pageSobre,ministerios:pageMinisterios,galeria:pageGaleria,visita:pageVisita,contato:pageContato};
   const body=view.page==="album"?pageAlbum(c,view.album):(map[view.page]||pageInicio)(c);
-  s.innerHTML=liveBar(c)+header(c,L)+`<main class="${view.fresh?"page-enter":""}">${body}</main>`+tlRibbon(c)+footer(c)+(lightbox?lightboxHtml(c):"")+(profileOpen?profileModal(c):"")+(bagOpen?bagHtml(c):"")+liveNudge(c);
+  s.innerHTML=liveBar(c)+header(c,L)+`<main class="${view.fresh?"page-enter":""}">${body}</main>`+tlRibbon(c)+footer(c)+(profileOpen?profileModal(c):"")+(bagOpen?bagHtml(c):"")+liveNudge(c);
+  lbRender(c);
   view.fresh=false;
   if(lastFocus){const el=s.querySelector(lastFocus);if(el)el.focus();lastFocus=null}
   if(!chatBusy)renderChat();

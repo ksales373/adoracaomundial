@@ -27,6 +27,6 @@ def mark(src, dst):
     sh=Image.new('RGBA',im.size,(0,0,0,0)); sh.putalpha(layer.split()[3].point(lambda v:int(v*0.55)))
     sh=sh.filter(ImageFilter.GaussianBlur(max(2,lh//14)))
     out=Image.alpha_composite(Image.alpha_composite(im.convert('RGBA'),sh),layer).convert('RGB')
-    out.save(dst,quality=84,optimize=True,progressive=True)
+    out.save(dst,quality=88,optimize=True,progressive=True)
 if __name__=='__main__':
     mark(sys.argv[1],sys.argv[2])
